@@ -75,8 +75,30 @@ npm run typecheck
 
 ---
 
+## Docker & VPS Hosting (1-Command Deploy)
+
+You can launch the entire stack (Next.js app + PostgreSQL 16) with Docker Compose:
+
+```bash
+# 1. Clone repository on VPS
+git clone <repo-url> ecommerce
+cd ecommerce
+
+# 2. Copy and customize .env
+cp .env.example .env
+
+# 3. Launch stack
+chmod +x deploy.sh docker-entrypoint.sh
+./deploy.sh
+```
+
+For complete instructions with Nginx, Let's Encrypt SSL, and automated Telegram cron, see the **[VPS Hosting Guide](docs/vps-hosting-guide.md)**.
+
+---
+
 ## Documentation Links
 
+- [Complete VPS Hosting Guide (Docker & SSL)](docs/vps-hosting-guide.md)
 - [Architecture & Design Details](docs/architecture.md)
 - [Payment Integration & Verification (SSLCommerz)](docs/payment-integration.md)
 - [Telegram Bot API Notifications Setup](docs/telegram-notifications.md)
