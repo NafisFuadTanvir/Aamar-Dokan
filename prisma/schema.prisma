@@ -1,0 +1,531 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Prisma Schema — Bangladesh E-Commerce Store
+// Money is always stored as integer poisha (1 BDT = 100 poisha). Never float.
+// Images are stored as bytea (≤ 2 MB each) — no external CDN required.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  PAID
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+  REFUND_PENDING
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  BKASH
+  NAGAD
+  ROCKET
+  CARD
+  OTHER
+}
+
+enum VerificationSource {
+  PROVIDER_API
+  SIGNED_CALLBACK
+  ADMIN_MANUAL
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+enum NotificationChannel {
+  TELEGRAM
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  NOT_CONFIGURED
+  RETRY_SCHEDULED
+}
+
+// ── Auth.js v5 Required Models ────────────────────────────────────────────────
+
+model User {
+  id              String     @id @default(cuid())
+  name            String?
+  email           String?    @unique
+  phone           String?    @unique
+  emailVerifiedAt DateTime?
+  passwordHash    String?    // Argon2id hash; never plaintext
+  image           String?
+  role            Role       @default(CUSTOMER)
+  status          UserStatus @default(ACTIVE)
+  mustChangePassword Boolean @default(false) // forced on first admin login
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  lastLoginAt     DateTime?
+
+  // Auth.js relations
+  accounts Account[]
+  sessions Session[]
+
+  // App relations
+  addresses        Address[]
+  orders           Order[]
+  reviews          Review[]
+  cart             Cart?
+  auditLogs        AuditLog[]
+  moderatedReviews Review[]   @relation("ModeratedBy")
+
+  @@index([email])
+  @@index([phone])
+  @@index([role, status])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Admin-assisted password reset (works without email configured)
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique // SHA-256 of the actual token; plaintext never stored
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdBy String?  // admin userId who generated it, null if self-requested
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// ── Address ───────────────────────────────────────────────────────────────────
+
+model Address {
+  id                   String   @id @default(cuid())
+  userId               String
+  recipientName        String
+  phone                String
+  addressLine          String
+  areaOrThana          String
+  district             String
+  postalCode           String?
+  deliveryInstructions String?
+  isDefault            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+// ── Category ──────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  imageData   Bytes?   // stored in PostgreSQL
+  imageMime   String?  // e.g. "image/webp"
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@index([slug])
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+// ── Product ───────────────────────────────────────────────────────────────────
+
+model Product {
+  id                   String        @id @default(cuid())
+  name                 String
+  slug                 String        @unique
+  sku                  String?       @unique
+  shortDescription     String?
+  description          String        @db.Text
+  // For simple products: base price. For variable products: set to lowest variant price (denormalised, updated on variant change).
+  pricePoisha          BigInt
+  compareAtPricePoisha BigInt?
+  stockQuantity        Int           @default(0) // for simple products; denormalised sum for variable
+  reservedQuantity     Int           @default(0) // for simple products
+  lowStockThreshold    Int           @default(5)
+  status               ProductStatus @default(DRAFT)
+  isFeatured           Boolean       @default(false)
+  hasVariants          Boolean       @default(false)
+  categoryId           String?
+  weightGrams          Int?
+  seoTitle             String?
+  seoDescription       String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  category   Category?        @relation(fields: [categoryId], references: [id])
+  images     ProductImage[]
+  variants   ProductVariant[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@index([slug])
+  @@index([status, categoryId])
+  @@index([status, isFeatured])
+  @@index([status, createdAt])
+  @@index([categoryId, status])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  data      Bytes    // image bytes stored as bytea (≤ 2 MB enforced in application layer)
+  mimeType  String   // "image/jpeg" | "image/png" | "image/webp" only
+  sizeBytes Int      // must be ≤ 2_097_152
+  altText   String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id                   String   @id @default(cuid())
+  productId            String
+  sku                  String?
+  label                String   // e.g. "100g", "Large", "Combo of 3"
+  attributeName        String?  // e.g. "Weight", "Size"
+  attributeValue       String?  // e.g. "100g", "Large"
+  pricePoisha          BigInt   // variant-specific price in poisha
+  compareAtPricePoisha BigInt?
+  stockQuantity        Int      @default(0)
+  reservedQuantity     Int      @default(0)
+  sortOrder            Int      @default(0)
+  isActive             Boolean  @default(true)
+  variantImageId       String?  // optional: ID of a ProductImage for this variant
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([productId, isActive])
+  @@index([productId, sortOrder])
+  @@map("product_variants")
+}
+
+// ── Cart ──────────────────────────────────────────────────────────────────────
+
+model Cart {
+  id             String   @id @default(cuid())
+  userId         String?  @unique
+  guestTokenHash String?  @unique // SHA-256 of client-held token
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user  User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  productId String
+  variantId String?
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@unique([cartId, productId, variantId])
+  @@map("cart_items")
+}
+
+// ── Order ─────────────────────────────────────────────────────────────────────
+
+model Order {
+  id                   String        @id @default(cuid())
+  orderNumber          String        @unique // e.g. "ORD-20240929-0001"
+  userId               String?
+  // Customer snapshot (never updated after order creation)
+  customerName         String
+  customerPhone        String
+  customerEmail        String?
+  // Delivery address snapshot
+  addressLine          String
+  areaOrThana          String
+  district             String
+  postalCode           String?
+  deliveryInstructions String?
+  // Financial snapshot — all in poisha, never updated after creation
+  subtotalPoisha       BigInt
+  deliveryFeePoisha    BigInt
+  discountPoisha       BigInt        @default(0)
+  totalPoisha          BigInt
+  currency             String        @default("BDT")
+  // State
+  paymentStatus        PaymentStatus @default(INITIATED)
+  orderStatus          OrderStatus   @default(PENDING_PAYMENT)
+  // Notes
+  customerNote         String?
+  internalNote         String?       // not visible to customers
+  idempotencyKey       String?       @unique
+  // Timestamps
+  paidAt               DateTime?
+  cancelledAt          DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relations
+  userId_ref    User?               @relation(fields: [userId], references: [id])
+  addressRef    Address?            @relation(fields: [savedAddressId], references: [id])
+  savedAddressId String?
+  items         OrderItem[]
+  payments      Payment[]
+  notifications NotificationOutbox[]
+
+  @@index([orderNumber])
+  @@index([userId, createdAt])
+  @@index([orderStatus, createdAt])
+  @@index([paymentStatus, createdAt])
+  @@index([customerPhone])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String  @id @default(cuid())
+  orderId             String
+  productId           String? // nullable: product may be archived/deleted later
+  variantId           String? // nullable
+  // Snapshots — immutable after creation
+  productNameSnapshot String
+  skuSnapshot         String?
+  variantSnapshot     String? // e.g. "100g" — exact label at time of order
+  attributeSnapshot   Json?   // e.g. {"Weight": "100g"}
+  unitPricePoisha     BigInt
+  quantity            Int
+  lineTotalPoisha     BigInt
+
+  order   Order           @relation(fields: [orderId], references: [id])
+  product Product?        @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// ── Payment ───────────────────────────────────────────────────────────────────
+
+model Payment {
+  id                    String              @id @default(cuid())
+  orderId               String
+  provider              String              // e.g. "SSLCOMMERZ" | "MOCK"
+  method                PaymentMethod?
+  status                PaymentStatus       @default(INITIATED)
+  amountPoisha          BigInt
+  currency              String              @default("BDT")
+  providerPaymentId     String?             // provider session/transaction ID
+  providerTransactionId String?             @unique // for deduplication
+  providerEventId       String?             // IPN event ID for deduplication
+  idempotencyKey        String              @unique
+  initiatedAt           DateTime            @default(now())
+  verifiedAt            DateTime?
+  failureCode           String?
+  failureMessage        String?
+  verificationSource    VerificationSource?
+  rawResponseSummary    String?             @db.Text // redacted summary; NO secrets
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@index([providerTransactionId])
+  @@index([providerEventId])
+  @@map("payments")
+}
+
+// ── Review ────────────────────────────────────────────────────────────────────
+
+model Review {
+  id                 String       @id @default(cuid())
+  productId          String
+  userId             String
+  rating             Int          // 1–5; enforced by CHECK constraint in migration
+  title              String?
+  comment            String       @db.Text
+  status             ReviewStatus @default(PENDING)
+  isVerifiedPurchase Boolean      @default(false)
+  moderatedBy        String?
+  moderatedAt        DateTime?
+  moderationNote     String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  product   Product @relation(fields: [productId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+  moderator User?   @relation("ModeratedBy", fields: [moderatedBy], references: [id])
+
+  @@unique([productId, userId]) // one review per customer per product
+  @@index([productId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("reviews")
+}
+
+// ── Notification Outbox ───────────────────────────────────────────────────────
+
+model NotificationOutbox {
+  id                String              @id @default(cuid())
+  orderId           String
+  channel           NotificationChannel
+  templateKey       String
+  payload           Json                // non-secret order/customer fields only
+  status            NotificationStatus  @default(PENDING)
+  idempotencyKey    String              @unique // e.g. "order-paid:{orderId}:admin-telegram"
+  attemptCount      Int                 @default(0)
+  maxAttempts       Int                 @default(5)
+  nextAttemptAt     DateTime?
+  providerMessageId String?             // Telegram message_id when sent
+  lastError         String?             // redacted; no secrets
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([status, nextAttemptAt])
+  @@index([orderId])
+  @@map("notification_outbox")
+}
+
+// ── Audit Log ─────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?  // null for system events
+  action      String   // e.g. "ORDER_STATUS_CHANGED", "PAYMENT_MANUAL_VERIFY"
+  entityType  String   // e.g. "Order", "Product", "Review"
+  entityId    String
+  metadata    Json?    // safe, non-secret context
+  ipHash      String?  // SHA-256 of IP; never raw IP
+  createdAt   DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id])
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ── Store Settings ────────────────────────────────────────────────────────────
+// Non-secret settings only. Secrets belong in environment variables.
+
+model StoreSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("store_settings")
+}
