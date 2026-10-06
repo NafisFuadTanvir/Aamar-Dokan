@@ -11,6 +11,8 @@ import {
   LogOut,
   Store,
   ShieldCheck,
+  Users,
+  Tag,
 } from "lucide-react";
 
 export default async function AdminLayout({
@@ -66,6 +68,22 @@ export default async function AdminLayout({
           >
             <ShoppingBag className="w-4 h-4 text-blue-400" />
             <span>অর্ডার ও পেমেন্ট</span>
+          </Link>
+
+          <Link
+            href="/admin/customers"
+            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/80 hover:text-white text-slate-300 transition"
+          >
+            <Users className="w-4 h-4 text-amber-400" />
+            <span>গ্রাহক তালিকা</span>
+          </Link>
+
+          <Link
+            href="/admin/referrals"
+            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/80 hover:text-white text-slate-300 transition"
+          >
+            <Tag className="w-4 h-4 text-gold-400" />
+            <span>রেফারেল কোড</span>
           </Link>
 
           <Link

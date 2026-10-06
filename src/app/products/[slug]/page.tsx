@@ -6,7 +6,8 @@ import { ProductDetailClient } from "@/components/product/ProductDetailClient";
 import { db } from "@/lib/db";
 import type { Metadata } from "next";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 interface ProductPageProps {
   params: {
@@ -51,7 +52,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           where: { isActive: true },
           orderBy: { sortOrder: "asc" },
         },
-        category: true,
         reviews: {
           where: { status: "APPROVED" },
           include: {

@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       customerNote,
       items,
       idempotencyKey,
+      referralCode: rawReferralCode,
     } = body;
 
     // Validate customer inputs
@@ -130,7 +131,47 @@ export async function POST(request: NextRequest) {
     // Calculate delivery fee
     const deliveryFeePoishaNum = calculateDeliveryFeePoisha(districtId);
     const deliveryFeePoisha = BigInt(deliveryFeePoishaNum);
-    const totalPoisha = calculatedSubtotalPoisha + deliveryFeePoisha;
+
+    // ── Referral Code Validation ──────────────────────────────────────────────
+    let discountPoisha = BigInt(0);
+    let validatedReferralCodeId: string | null = null;
+    let validatedReferralCodeSnapshot: string | null = null;
+
+    if (rawReferralCode) {
+      const codeUpper = String(rawReferralCode).trim().toUpperCase();
+      const referral = await db.referralCode.findUnique({
+        where: { code: codeUpper },
+      });
+
+      if (
+        referral &&
+        referral.isActive &&
+        (!referral.expiresAt || referral.expiresAt > new Date()) &&
+        (referral.maxUsage === null || referral.usageCount < referral.maxUsage) &&
+        calculatedSubtotalPoisha >= referral.minOrderPoisha
+      ) {
+        if (referral.discountType === "PERCENTAGE") {
+          discountPoisha = BigInt(
+            Math.floor(
+              (Number(calculatedSubtotalPoisha) * Number(referral.discountValue)) / 10000
+            )
+          );
+        } else {
+          discountPoisha = referral.discountValue;
+        }
+        // Clamp: discount can never exceed subtotal
+        if (discountPoisha > calculatedSubtotalPoisha) {
+          discountPoisha = calculatedSubtotalPoisha;
+        }
+        validatedReferralCodeId = referral.id;
+        validatedReferralCodeSnapshot = referral.code;
+      }
+      // If invalid, we silently ignore — client already validates;
+      // a mismatch is not a hard error to avoid abuse of false negatives.
+    }
+
+    const totalPoisha =
+      calculatedSubtotalPoisha + deliveryFeePoisha - discountPoisha;
 
     // Generate Order Number
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -152,7 +193,10 @@ export async function POST(request: NextRequest) {
           postalCode: postalCode?.trim() || null,
           subtotalPoisha: calculatedSubtotalPoisha,
           deliveryFeePoisha,
+          discountPoisha,
           totalPoisha,
+          referralCodeId: validatedReferralCodeId,
+          referralCodeSnapshot: validatedReferralCodeSnapshot,
           paymentStatus: "INITIATED",
           orderStatus: "PENDING_PAYMENT",
           customerNote: customerNote?.trim() || null,
@@ -187,6 +231,14 @@ export async function POST(request: NextRequest) {
             data: { reservedQuantity: { increment: it.quantity } },
           });
         }
+      }
+
+      // Increment referral code usage counter
+      if (validatedReferralCodeId) {
+        await tx.referralCode.update({
+          where: { id: validatedReferralCodeId },
+          data: { usageCount: { increment: 1 } },
+        });
       }
 
       return order;

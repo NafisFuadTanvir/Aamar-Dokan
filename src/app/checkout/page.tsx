@@ -12,11 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import {
   ShoppingBag,
   ShieldCheck,
-  Truck,
-  CreditCard,
   AlertCircle,
   CheckCircle2,
   ArrowRight,
+  Tag,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -38,8 +37,55 @@ export default function CheckoutPage() {
     null
   );
 
+  // ── Referral Code ─────────────────────────────────────────────────────────
+  const [referralCode, setReferralCode] = useState("");
+  const [referralInput, setReferralInput] = useState("");
+  const [referralError, setReferralError] = useState<string | null>(null);
+  const [referralSuccess, setReferralSuccess] = useState<string | null>(null);
+  const [discountPoisha, setDiscountPoisha] = useState(0);
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
+
   const deliveryFeePoisha = calculateDeliveryFeePoisha(districtId);
-  const totalPoisha = subtotalPoisha + deliveryFeePoisha;
+  const totalPoisha = subtotalPoisha + deliveryFeePoisha - discountPoisha;
+
+  const handleApplyCode = async () => {
+    const code = referralInput.trim().toUpperCase();
+    if (!code) return;
+    setReferralError(null);
+    setReferralSuccess(null);
+    setIsValidatingCode(true);
+    try {
+      const res = await fetch("/api/referral/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, subtotalPoisha }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setReferralError(data.error || "কোড অবৈধ");
+        setReferralCode("");
+        setDiscountPoisha(0);
+      } else {
+        setReferralCode(data.code);
+        setDiscountPoisha(data.discountPoisha);
+        setReferralSuccess(
+          `কোড প্রয়োগ হয়েছে! আপনি ${formatPrice(data.discountPoisha)} ছাড় পেয়েছেন।`
+        );
+      }
+    } catch {
+      setReferralError("কোড যাচাই করতে সমস্যা হয়েছে।");
+    } finally {
+      setIsValidatingCode(false);
+    }
+  };
+
+  const handleRemoveCode = () => {
+    setReferralCode("");
+    setReferralInput("");
+    setDiscountPoisha(0);
+    setReferralSuccess(null);
+    setReferralError(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +103,7 @@ export default function CheckoutPage() {
       !addressLine.trim() ||
       !areaOrThana.trim()
     ) {
-      setErrorMessage("দয়া করে নাম, মোবাইল নম্বর এবং সম্পূর্ণ ঠিকানা প্রদান করুন।");
+      setErrorMessage("দয়া করে নাম, মোবাইল নম্বর এবং সম্পূর্ণ ঠিকানা প্রদান করুন।");
       return;
     }
 
@@ -76,6 +122,7 @@ export default function CheckoutPage() {
           districtId,
           postalCode,
           customerNote,
+          referralCode: referralCode || null,
           items: items.map((i) => ({
             productId: i.productId,
             variantId: i.variantId || null,
@@ -88,7 +135,7 @@ export default function CheckoutPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "অর্ডার প্রক্রিয়াকরণে সমস্যা হয়েছে।");
+        throw new Error(data.error || "অর্ডার প্রক্রিয়াকরণে সমস্যা হয়েছে।");
       }
 
       // If payment gateway returned redirect URL
@@ -98,14 +145,14 @@ export default function CheckoutPage() {
       } else if (data.paymentStatus === "NOT_CONFIGURED") {
         clearCart();
         setNotConfiguredNotice(
-          `আপনার অর্ডার #${data.orderNumber} সফলভাবে গ্রহণ করা হয়েছে (পেন্ডিং পেমেন্ট)। সার্ভারে পেমেন্ট গেটওয়ের ক্রেডেনশিয়াল কনফিগার করা নেই। অনুগ্রহ করে অ্যাডমিন প্যানেল থেকে কনফিগার করুন।`
+          `আপনার অর্ডার #${data.orderNumber} সফলভাবে গ্রহণ করা হয়েছে (পেন্ডিং পেমেন্ট)। সার্ভারে পেমেন্ট গেটওয়ের ক্রেডেনশিয়াল কনফিগার করা নেই। অনুগ্রহ করে অ্যাডমিন প্যানেল থেকে কনফিগার করুন।`
         );
       } else {
         clearCart();
         window.location.href = `/orders/confirm?orderNumber=${data.orderNumber}`;
       }
     } catch (err: any) {
-      setErrorMessage(err.message || "অর্ডার সম্পন্ন করতে সমস্যা হয়েছে।");
+      setErrorMessage(err.message || "অর্ডার সম্পন্ন করতে সমস্যা হয়েছে।");
     } finally {
       setIsLoading(false);
     }
@@ -131,15 +178,15 @@ export default function CheckoutPage() {
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold text-slate-800">
-              অর্ডার রেকর্ড সংরক্ষিত হয়েছে
+              অর্ডার রেকর্ড সংরক্ষিত হয়েছে
             </h2>
             <p className="text-sm text-slate-600 leading-relaxed">
               {notConfiguredNotice}
             </p>
             <div className="p-4 bg-slate-50 rounded-2xl text-xs text-left text-slate-600 space-y-1">
-              <p className="font-semibold text-slate-700">প্রয়োজনীয় পদক্ষেপ:</p>
+              <p className="font-semibold text-slate-700">প্রয়োজনীয় পদক্ষেপ:</p>
               <p>১. `.env` ফাইলে SSLCOMMERZ_STORE_ID এবং SSLCOMMERZ_STORE_PASSWORD সেট করুন।</p>
-              <p>২. অ্যাডমিন ড্যাশবোর্ড থেকে অর্ডারটি ম্যানুয়ালি পর্যালোচনা করতে পারেন।</p>
+              <p>২. অ্যাডমিন ড্যাশবোর্ড থেকে অর্ডারটি ম্যানুয়ালি পর্যালোচনা করতে পারেন।</p>
             </div>
             <Link href="/" className="inline-block mt-4">
               <Button variant="primary">হোমপেজে ফিরে যান</Button>
@@ -185,7 +232,7 @@ export default function CheckoutPage() {
                   />
 
                   <Input
-                    label="সক্রিয় মোবাইল নম্বর *"
+                    label="সক্রিয় মোবাইল নম্বর *"
                     placeholder="01700000000"
                     type="tel"
                     value={customerPhone}
@@ -229,7 +276,7 @@ export default function CheckoutPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
-                    label="থানা / এরিয়া *"
+                    label="থানা / এরিয়া *"
                     placeholder="যেমন: ধানমন্ডি / মিরপুর / কোতোয়ালী"
                     value={areaOrThana}
                     onChange={(e) => setAreaOrThana(e.target.value)}
@@ -246,7 +293,7 @@ export default function CheckoutPage() {
 
                 <Input
                   label="সম্পূর্ণ ঠিকানা (বাসা / রোড / ফ্ল্যাট নম্বর) *"
-                  placeholder="যেমন: বাড়ি ১২, রোড ৫, ব্লক বি"
+                  placeholder="যেমন: বাড়ি ১২, রোড ৫, ব্লক বি"
                   value={addressLine}
                   onChange={(e) => setAddressLine(e.target.value)}
                   required
@@ -254,10 +301,67 @@ export default function CheckoutPage() {
 
                 <Input
                   label="অর্ডার নোট / ডেলিভারি নির্দেশনা (ঐচ্ছিক)"
-                  placeholder="যেমন: বিকেলে ডেলিভারি দিলে ভালো হয়"
+                  placeholder="যেমন: বিকেলে ডেলিভারি দিলে ভালো হয়"
                   value={customerNote}
                   onChange={(e) => setCustomerNote(e.target.value)}
                 />
+              </div>
+
+              {/* Referral Code */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-3">
+                <h2 className="text-base font-bold text-slate-900 border-b pb-3 flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-brand-700" />
+                  <span>৩. রেফারেল / কুপন কোড (ঐচ্ছিক)</span>
+                </h2>
+
+                {referralCode ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-green-50 border border-green-200">
+                    <div>
+                      <p className="text-xs font-bold text-green-800">
+                        ✓ কোড: <span className="font-mono">{referralCode}</span>
+                      </p>
+                      <p className="text-[11px] text-green-700 mt-0.5">
+                        {referralSuccess}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCode}
+                      className="text-[11px] text-red-500 hover:text-red-700 font-semibold"
+                    >
+                      সরান
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="কোড লিখুন (যেমন: SAVE10)"
+                      value={referralInput}
+                      onChange={(e) => {
+                        setReferralInput(e.target.value.toUpperCase());
+                        setReferralError(null);
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyCode())}
+                      className="flex-1 h-11 rounded-xl border border-slate-300 bg-white px-3.5 text-sm font-mono uppercase tracking-wider focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 placeholder:normal-case placeholder:tracking-normal placeholder:font-sans"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCode}
+                      disabled={isValidatingCode || !referralInput.trim()}
+                      className="px-4 h-11 rounded-xl bg-brand-700 text-white text-sm font-bold hover:bg-brand-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isValidatingCode ? "..." : "প্রয়োগ"}
+                    </button>
+                  </div>
+                )}
+
+                {referralError && (
+                  <p className="text-[11px] text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {referralError}
+                  </p>
+                )}
               </div>
 
               {/* Prepaid Only Policy Note */}
@@ -321,8 +425,26 @@ export default function CheckoutPage() {
                     </span>
                   </div>
 
+                  {/* ── Discount Row (shown only when a code is applied) ── */}
+                  {discountPoisha > 0 && (
+                    <div className="flex justify-between items-center py-1.5 px-2 -mx-2 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700">
+                      <span className="flex items-center gap-1 font-semibold">
+                        <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                        রেফারেল ছাড়
+                        {referralCode && (
+                          <span className="font-mono font-bold ml-0.5 text-emerald-800">
+                            ({referralCode})
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-bold">
+                        - {formatPrice(discountPoisha)}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-baseline pt-3 border-t border-slate-200 text-base font-bold text-slate-900">
-                    <span>সর্বমোট প্রদেয় (Total)</span>
+                    <span>সর্বমোট প্রদেয় (Total)</span>
                     <span className="text-xl font-extrabold text-brand-700">
                       {formatPrice(totalPoisha)}
                     </span>

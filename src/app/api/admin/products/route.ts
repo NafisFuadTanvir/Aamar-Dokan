@@ -160,3 +160,65 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
+
+  // Role verification
+  if (!session || !session.user || (session.user as any).role !== "ADMIN") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    let id = searchParams.get("id");
+
+    if (!id) {
+      try {
+        const body = await request.json();
+        id = body?.id;
+      } catch (_) {}
+    }
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "পণ্য ID প্রদান করা আবশ্যক।" },
+        { status: 400 }
+      );
+    }
+
+    await db.$transaction(async (tx) => {
+      // 1. Delete associated cart items
+      await tx.cartItem.deleteMany({
+        where: { productId: id },
+      });
+
+      // 2. Delete product reviews
+      await tx.review.deleteMany({
+        where: { productId: id },
+      });
+
+      // 3. Nullify productId on historical order items so receipts stay intact
+      await tx.orderItem.updateMany({
+        where: { productId: id },
+        data: { productId: null, variantId: null },
+      });
+
+      // 4. Delete the product itself (variants and images cascade delete)
+      await tx.product.delete({
+        where: { id },
+      });
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "পণ্য সফলভাবে মুছে ফেলা হয়েছে।",
+    });
+  } catch (error: any) {
+    console.error("Admin product delete error:", error);
+    return NextResponse.json(
+      { error: error.message || "পণ্য মুছে ফেলতে সমস্যা হয়েছে।" },
+      { status: 500 }
+    );
+  }
+}

@@ -11,6 +11,7 @@ import {
   Send,
   ArrowRight,
   Plus,
+  Users,
 } from "lucide-react";
 
 export const revalidate = 0; // Live admin dashboard
@@ -22,6 +23,8 @@ export default async function AdminDashboardPage() {
   let pendingNotificationCount = 0;
   let recentOrders: any[] = [];
   let productCount = 0;
+  let customerCount = 0;
+  let recentCustomers: any[] = [];
 
   try {
     const [
@@ -31,6 +34,8 @@ export default async function AdminDashboardPage() {
       orders,
       productsTotal,
       paidRevenueAggregate,
+      usersTotal,
+      latestUsers,
     ] = await Promise.all([
       db.order.count(),
       db.order.count({ where: { paymentStatus: "PAID" } }),
@@ -45,6 +50,15 @@ export default async function AdminDashboardPage() {
         where: { paymentStatus: "PAID" },
         _sum: { totalPoisha: true },
       }),
+      db.user.count({ where: { role: "CUSTOMER" } }),
+      db.user.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: {
+          orders: { select: { id: true } },
+          addresses: { select: { district: true, areaOrThana: true } },
+        },
+      }),
     ]);
 
     totalOrdersCount = ordersCount;
@@ -53,8 +67,10 @@ export default async function AdminDashboardPage() {
     recentOrders = orders;
     productCount = productsTotal;
     totalRevenuePoisha = paidRevenueAggregate._sum?.totalPoisha || BigInt(0);
+    customerCount = usersTotal;
+    recentCustomers = latestUsers;
   } catch (e) {
-    // Database fallback
+    console.error("Dashboard data fetch error:", e);
   }
 
   return (
@@ -66,7 +82,7 @@ export default async function AdminDashboardPage() {
             ড্যাশবোর্ড ওভারভিউ
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            রিয়েলটাইম বিক্রয়, অর্ডার ও নোটিফিকেশন পর্যবেক্ষণ করুন
+            রিয়েলটাইম বিক্রয়, অর্ডার, নিবন্ধিত গ্রাহক ও নোটিফিকেশন পর্যবেক্ষণ করুন
           </p>
         </div>
 
@@ -81,68 +97,90 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Revenue */}
-        <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400 font-medium">মোট বিক্রয় (PAID)</span>
             <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white">
+          <div className="text-xl font-bold text-white">
             {formatPrice(totalRevenuePoisha)}
           </div>
-          <span className="text-[11px] text-emerald-400 block">
-            {paidOrdersCount}টি যাচাইকৃত পেইড অর্ডার
+          <span className="text-[11px] text-emerald-400 block truncate">
+            {paidOrdersCount}টি পেইড অর্ডার
           </span>
         </div>
 
         {/* Total Orders */}
-        <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400 font-medium">মোট অর্ডার সংখ্যা</span>
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
               <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white">
+          <div className="text-xl font-bold text-white">
             {totalOrdersCount}
           </div>
           <span className="text-[11px] text-slate-400 block">
-            সকল অর্ডার হিস্ট্রি
+            সর্বমোট অর্ডার
           </span>
         </div>
 
-        {/* Pending Telegram Notifications */}
-        <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+        {/* Total Customers */}
+        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">টেলিগ্রাম নোটিফিকেশন</span>
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
-              <Send className="w-4 h-4" />
+            <span className="text-xs text-slate-400 font-medium">নিবন্ধিত গ্রাহক</span>
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <Users className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white">
-            {pendingNotificationCount}
+          <div className="text-xl font-bold text-white">
+            {customerCount}
           </div>
-          <span className="text-[11px] text-cyan-400 block">
-            আউটবক্সে অপেক্ষমান মেসেজ
-          </span>
+          <Link
+            href="/admin/customers"
+            className="text-[11px] text-amber-400 hover:underline block font-semibold"
+          >
+            গ্রাহক তালিকা দেখুন →
+          </Link>
         </div>
 
         {/* Product Count */}
-        <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400 font-medium">মোট পণ্য সংখ্যা</span>
             <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
               <Package className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white">
+          <div className="text-xl font-bold text-white">
             {productCount}
           </div>
-          <span className="text-[11px] text-slate-400 block">
-            ক্যাটালগ পণ্যসমূহ
+          <Link
+            href="/admin/products"
+            className="text-[11px] text-purple-400 hover:underline block"
+          >
+            পণ্য ব্যবস্থাপনা →
+          </Link>
+        </div>
+
+        {/* Telegram Notifications */}
+        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400 font-medium">টেলিগ্রাম নোটিফিকেশন</span>
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+              <Send className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-xl font-bold text-white">
+            {pendingNotificationCount}
+          </div>
+          <span className="text-[11px] text-cyan-400 block truncate">
+            আউটবক্সে অপেক্ষমান
           </span>
         </div>
       </div>
@@ -208,6 +246,78 @@ export default async function AdminDashboardPage() {
                       >
                         বিস্তারিত →
                       </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Recent Registered Customers Section */}
+      <div className="p-6 rounded-3xl bg-slate-950 border border-slate-800 space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-amber-400" />
+            <h2 className="text-base font-bold text-white">
+              সাম্প্রতিক নিবন্ধিত গ্রাহকগণ
+            </h2>
+          </div>
+          <Link
+            href="/admin/customers"
+            className="text-xs text-gold-400 hover:text-gold-300 font-semibold flex items-center gap-1"
+          >
+            <span>সকল গ্রাহক তালিকা</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {recentCustomers.length === 0 ? (
+          <p className="text-xs text-slate-500 py-6 text-center">
+            এখনও কোনো গ্রাহক অ্যাকাউন্ট খোলেননি।
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800">
+                <tr>
+                  <th className="p-3">গ্রাহক</th>
+                  <th className="p-3">মোবাইল নম্বর</th>
+                  <th className="p-3">ইমেইল</th>
+                  <th className="p-3">অর্ডার সংখ্যা</th>
+                  <th className="p-3">যোগদানের তারিখ</th>
+                  <th className="p-3">স্ট্যাটাস</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {recentCustomers.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-900/40">
+                    <td className="p-3 font-semibold text-white">
+                      {u.name || "নামহীন গ্রাহক"}
+                    </td>
+                    <td className="p-3 font-mono text-slate-300">
+                      {u.phone || "-"}
+                    </td>
+                    <td className="p-3 text-slate-400">
+                      {u.email || "-"}
+                    </td>
+                    <td className="p-3">
+                      <span className="text-emerald-400 font-semibold">
+                        {u.orders.length} টি
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-400">
+                      {new Date(u.createdAt).toLocaleDateString("bn-BD", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={u.status === "ACTIVE" ? "success" : "default"}>
+                        {u.status}
+                      </Badge>
                     </td>
                   </tr>
                 ))}

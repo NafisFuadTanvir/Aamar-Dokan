@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -9,7 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Lock, ArrowRight } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl");
+
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +40,19 @@ export default function LoginPage() {
       if (result?.error) {
         setError("ভুল ইমেইল/ফোন বা পাসওয়ার্ড। অনুগ্রহ করে আবার চেষ্টা করুন।");
       } else {
-        window.location.href = "/account";
+        if (callbackUrl) {
+          window.location.href = callbackUrl;
+        } else {
+          try {
+            const sessionRes = await fetch("/api/auth/session");
+            const sessionData = await sessionRes.json();
+            if (sessionData?.user?.role === "ADMIN") {
+              window.location.href = "/admin";
+              return;
+            }
+          } catch (_) {}
+          window.location.href = "/account";
+        }
       }
     } catch (err: any) {
       setError(err.message || "লগইন করতে সমস্যা হয়েছে।");
@@ -123,5 +139,19 @@ export default function LoginPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-slate-500">
+          লোড হচ্ছে...
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

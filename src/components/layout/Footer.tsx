@@ -91,13 +91,13 @@ export function Footer() {
             <h4 className="text-white font-bold text-sm">প্রয়োজনীয় লিংক</h4>
             <ul className="space-y-2 text-xs text-slate-400">
               <li>
-                <Link href="/products" className="hover:text-white transition">
-                  সকল পণ্য
+                <Link href="/about" className="hover:text-white transition">
+                  আমাদের সম্পর্কে
                 </Link>
               </li>
               <li>
-                <Link href="/categories" className="hover:text-white transition">
-                  ক্যাটাগরি সমূহ
+                <Link href="/products" className="hover:text-white transition">
+                  সকল পণ্য
                 </Link>
               </li>
               <li>

@@ -1,6 +1,171 @@
 # Amar Dokan (আমার দোকান) — Bangladesh E-Commerce Store
 
-Production-minded, mobile-first full-stack e-commerce web application tailored for Bangladesh, supporting prepaid digital payments (bKash, Nagad, Rocket, Cards), PostgreSQL image storage (`bytea`), and automated **Telegram Bot API** order notifications.
+Full-stack e-commerce built with Next.js 14, PostgreSQL, SSLCommerz (bKash/Nagad/Rocket), and Telegram Bot notifications. Runs fully in Docker on your local PC.
+
+---
+
+## ▶️ How to Run (Every Time)
+
+> **Prerequisite (one-time):** [Docker Desktop](https://www.docker.com/products/docker-desktop/) must be installed and running.
+
+Open a terminal inside `D:\Nafis\Ecommerce` and run:
+
+```powershell
+docker compose up -d
+```
+
+That's it. Docker will:
+1. Start PostgreSQL and wait until it's healthy
+2. Sync the database schema automatically (Prisma 5)
+3. Start the Next.js app
+
+| URL | Purpose |
+|---|---|
+| http://localhost:3000 | Storefront |
+| http://localhost:3000/admin | Admin dashboard |
+
+### Stop the app
+```powershell
+docker compose down
+```
+
+### View live logs
+```powershell
+docker compose logs -f web       # Next.js app logs
+docker compose logs -f postgres  # Database logs
+```
+
+### Rebuild after code changes
+```powershell
+docker compose build web
+docker compose up -d
+```
+
+---
+
+## 🛠️ First-Time Setup (Only Once)
+
+### 1. Copy environment file
+```powershell
+copy .env.example .env
+```
+Edit `.env` and fill in your credentials (see [Required Environment Variables](#-required-environment-variables) below).
+
+### 2. Start the stack
+```powershell
+docker compose up -d
+```
+The schema is auto-applied on first start. ✅
+
+### 3. Create your admin account
+```powershell
+docker exec -it ecommerce_web node scripts/create-admin.js
+```
+Or run locally (requires Node.js installed on your PC):
+```powershell
+npm run admin:create
+```
+
+### 4. (Optional) Seed demo products
+```powershell
+npm run db:seed
+```
+
+---
+
+## 🔑 Required Environment Variables
+
+Edit `D:\Nafis\Ecommerce\.env`:
+
+```env
+# ── Required ──────────────────────────────────────────────────────
+APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_STORE_NAME="Amar Dokan"
+
+AUTH_SECRET=<random 32+ chars>      # openssl rand -base64 32
+CRON_SECRET=<random 16+ chars>      # openssl rand -base64 16
+
+# ── Optional: Payment (live orders won't process without this) ─────
+SSLCOMMERZ_STORE_ID=your_store_id
+SSLCOMMERZ_STORE_PASSWORD=your_password
+SSLCOMMERZ_SANDBOX=true             # change to false for live payments
+
+# ── Optional: Telegram order notifications ─────────────────────────
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+TELEGRAM_CHAT_ID=-100123456789
+
+# ── Optional: Email for password reset ────────────────────────────
+EMAIL_SMTP_HOST=smtp.gmail.com
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_USER=your@gmail.com
+EMAIL_SMTP_PASS=your_app_password
+EMAIL_FROM="Amar Dokan <noreply@yourdomain.com>"
+```
+
+> Without SSLCommerz or Telegram credentials the app still runs — it shows a clear `NOT_CONFIGURED` status instead of crashing.
+
+---
+
+## 📋 Common Commands Cheat Sheet
+
+```powershell
+# Start everything
+docker compose up -d
+
+# Stop everything
+docker compose down
+
+# Stop AND wipe database data (full reset)
+docker compose down -v
+
+# Rebuild after code changes, then restart
+docker compose build web
+docker compose up -d
+
+# Watch app logs live
+docker compose logs -f web
+
+# Check container status
+docker compose ps
+
+# Open a shell inside the app container
+docker exec -it ecommerce_web sh
+
+# Run Prisma Studio (DB browser) — locally
+npx prisma studio
+
+# Run tests locally
+npm test
+npm run typecheck
+```
+
+---
+
+## 🏗️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14 (App Router) + TypeScript |
+| Styling | Tailwind CSS |
+| Database | PostgreSQL 16 + Prisma ORM |
+| Auth | NextAuth v5 + Argon2id |
+| Payment | SSLCommerz (bKash, Nagad, Rocket, Cards) |
+| Notifications | Telegram Bot API |
+| Images | PostgreSQL `bytea` (no CDN needed) |
+| Testing | Vitest |
+
+---
+
+## 📚 Documentation
+
+- [Architecture & Design](docs/architecture.md)
+- [Payment Integration (SSLCommerz)](docs/payment-integration.md)
+- [Telegram Notifications Setup](docs/telegram-notifications.md)
+- [Email Configuration](docs/email-configuration.md)
+- [Admin Operations Guide](docs/admin-guide.md)
+- [Security Checklist](docs/security-checklist.md)
+
 
 ---
 

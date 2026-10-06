@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -26,8 +26,6 @@ export default function NewProductPage() {
   const [name, setName] = useState("");
   const [shortDescription, setShortDescription] = useState("");
   const [description, setDescription] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [categories, setCategories] = useState<any[]>([]);
 
   // Simple vs Variable
   const [hasVariants, setHasVariants] = useState(false);
@@ -44,14 +42,6 @@ export default function NewProductPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Fetch categories
-    fetch("/api/categories")
-      .then((res) => (res.ok ? res.json() : { categories: [] }))
-      .then((data) => setCategories(data.categories || []))
-      .catch(() => {});
-  }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -118,7 +108,6 @@ export default function NewProductPage() {
       formData.append("name", name);
       formData.append("shortDescription", shortDescription);
       formData.append("description", description);
-      if (categoryId) formData.append("categoryId", categoryId);
       formData.append("hasVariants", hasVariants ? "true" : "false");
 
       if (!hasVariants) {

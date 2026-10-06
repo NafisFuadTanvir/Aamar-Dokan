@@ -1,43 +1,53 @@
 import type { Metadata } from "next";
-import { Inter, Hind_Siliguri } from "next/font/google";
+import { Hind_Siliguri, Anek_Bangla, Poppins } from "next/font/google";
 import { ClientProviders } from "@/components/providers/ClientProviders";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
+// Body & general UI font: Hind Siliguri (clean, ultra-legible Bengali matras)
+const hindSiliguri = Hind_Siliguri({
+  subsets: ["bengali", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-hind-siliguri",
   display: "swap",
 });
 
-const hindSiliguri = Hind_Siliguri({
-  weight: ["300", "400", "500", "600", "700"],
+// Modern, high-impact headings font: Anek Bangla
+const anekBangla = Anek_Bangla({
   subsets: ["bengali", "latin"],
-  variable: "--font-hind-siliguri",
+  weight: ["600", "700", "800"],
+  variable: "--font-anek-bangla",
+  display: "swap",
+});
+
+// Clean geometric English & numbers font: Poppins
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-poppins",
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Amar Dokan — Premium Online Shopping in Bangladesh",
-    template: "%s | Amar Dokan",
+    default: "আমার দোকান — খাঁটি প্রাকৃতিক হার্বাল পণ্য",
+    template: "%s | আমার দোকান",
   },
   description:
-    "Shop authentic products online with secure prepaid payment via bKash, Nagad, and Rocket. Fast delivery across Dhaka and all 64 districts of Bangladesh.",
+    "বাংলাদেশের বিশ্বস্ত হার্বাল ও স্বাস্থ্য পণ্যের অনলাইন শপ। ১০০% আসল ও প্রাকৃতিক পণ্য, নিরাপদ ডিজিটাল পেমেন্ট (bKash, Nagad, Rocket) ও দ্রুত ডেলিভারি সারা বাংলাদেশে।",
   keywords: [
-    "Bangladesh e-commerce",
-    "online shopping BD",
+    "হার্বাল পণ্য বাংলাদেশ",
+    "প্রাকৃতিক স্বাস্থ্য পণ্য",
+    "অনলাইন শপিং BD",
     "bKash payment",
+    "herbal health products Bangladesh",
     "Nagad payment",
-    "prepaid shopping",
-    "Dhaka online shop",
   ],
   metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
   openGraph: {
-    title: "Amar Dokan — Premium Online Shopping in Bangladesh",
-    description:
-      "Shop authentic products online with secure prepaid payment via bKash, Nagad, and Rocket.",
+    title: "আমার দোকান — খাঁটি প্রাকৃতিক হার্বাল পণ্য",
+    description: "বাংলাদেশের বিশ্বস্ত হার্বাল ও স্বাস্থ্য পণ্যের অনলাইন শপ।",
     url: "/",
-    siteName: "Amar Dokan",
+    siteName: "আমার দোকান",
     locale: "bn_BD",
     type: "website",
   },
@@ -49,8 +59,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="bn" className={`${inter.variable} ${hindSiliguri.variable}`}>
-      <body className="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased selection:bg-brand-100 selection:text-brand-900">
+    <html
+      lang="bn"
+      className={`${hindSiliguri.variable} ${anekBangla.variable} ${poppins.variable}`}
+    >
+      <body className="min-h-screen bg-cream-50 font-sans text-navy-900 antialiased selection:bg-saffron-200 selection:text-navy-900">
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>

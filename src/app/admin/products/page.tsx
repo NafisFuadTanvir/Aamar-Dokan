@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Edit, Trash2 } from "lucide-react";
+import { Plus, Package } from "lucide-react";
+import { ProductRowActions } from "./ProductRowActions";
 
 export const revalidate = 0;
 
@@ -67,6 +68,7 @@ export default async function AdminProductsPage() {
                   <th className="p-4">স্টক</th>
                   <th className="p-4">ভ্যারিয়েন্ট</th>
                   <th className="p-4">স্ট্যাটাস</th>
+                  <th className="p-4 text-right">অ্যাকশন</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
@@ -124,6 +126,9 @@ export default async function AdminProductsPage() {
                       >
                         {p.status}
                       </Badge>
+                    </td>
+                    <td className="p-4 text-right">
+                      <ProductRowActions productId={p.id} productName={p.name} />
                     </td>
                   </tr>
                 ))}

@@ -5,7 +5,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -90,6 +91,11 @@ enum NotificationStatus {
   FAILED
   NOT_CONFIGURED
   RETRY_SCHEDULED
+}
+
+enum DiscountType {
+  PERCENTAGE  // e.g. 10% off
+  FIXED       // e.g. 100 BDT off
 }
 
 // ── Auth.js v5 Required Models ────────────────────────────────────────────────
@@ -361,6 +367,9 @@ model Order {
   discountPoisha       BigInt        @default(0)
   totalPoisha          BigInt
   currency             String        @default("BDT")
+  // Referral / coupon code applied at checkout
+  referralCodeId       String?       // FK to ReferralCode if code was applied
+  referralCodeSnapshot String?       // the actual code string at time of order
   // State
   paymentStatus        PaymentStatus @default(INITIATED)
   orderStatus          OrderStatus   @default(PENDING_PAYMENT)
@@ -375,18 +384,20 @@ model Order {
   updatedAt            DateTime      @updatedAt
 
   // Relations
-  userId_ref    User?               @relation(fields: [userId], references: [id])
-  addressRef    Address?            @relation(fields: [savedAddressId], references: [id])
+  userId_ref     User?               @relation(fields: [userId], references: [id])
+  addressRef     Address?            @relation(fields: [savedAddressId], references: [id])
   savedAddressId String?
-  items         OrderItem[]
-  payments      Payment[]
-  notifications NotificationOutbox[]
+  referralCode   ReferralCode?       @relation(fields: [referralCodeId], references: [id])
+  items          OrderItem[]
+  payments       Payment[]
+  notifications  NotificationOutbox[]
 
   @@index([orderNumber])
   @@index([userId, createdAt])
   @@index([orderStatus, createdAt])
   @@index([paymentStatus, createdAt])
   @@index([customerPhone])
+  @@index([referralCodeId])
   @@map("orders")
 }
 
@@ -443,6 +454,30 @@ model Payment {
   @@index([providerTransactionId])
   @@index([providerEventId])
   @@map("payments")
+}
+
+// ── Referral Code ─────────────────────────────────────────────────────────────
+// Admin creates codes via /admin/referrals. Customers enter them at checkout.
+
+model ReferralCode {
+  id               String       @id @default(cuid())
+  code             String       @unique // human-readable, e.g. "SAVE10" (stored uppercase)
+  description      String?      // internal label, e.g. "Summer 2025 promo"
+  discountType     DiscountType @default(FIXED)
+  discountValue    BigInt       // if FIXED: poisha; if PERCENTAGE: basis points (100 = 1%)
+  minOrderPoisha   BigInt       @default(0) // minimum subtotal to use this code
+  maxUsage         Int?         // null = unlimited
+  usageCount       Int          @default(0) // auto-incremented on each valid order
+  isActive         Boolean      @default(true)
+  expiresAt        DateTime?    // null = never expires
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  orders           Order[]
+
+  @@index([code])
+  @@index([isActive, expiresAt])
+  @@map("referral_codes")
 }
 
 // ── Review ────────────────────────────────────────────────────────────────────

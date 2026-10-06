@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { verifyPassword } from "./password";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",

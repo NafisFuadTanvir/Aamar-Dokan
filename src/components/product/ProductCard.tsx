@@ -1,11 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
-import { ShoppingBag, Eye } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ShoppingBag, Eye, Leaf, CheckCircle2 } from "lucide-react";
 
 export interface ProductCardProps {
   id: string;
@@ -16,7 +15,6 @@ export interface ProductCardProps {
   hasVariants?: boolean;
   stockQuantity: number;
   imageId?: string | null;
-  categoryName?: string | null;
 }
 
 export function ProductCard({
@@ -28,9 +26,9 @@ export function ProductCard({
   hasVariants = false,
   stockQuantity,
   imageId,
-  categoryName,
 }: ProductCardProps) {
   const { addItem } = useCart();
+  const [adding, setAdding] = useState(false);
   const isOutOfStock = stockQuantity <= 0;
 
   const currentPrice = Number(pricePoisha);
@@ -40,13 +38,14 @@ export function ProductCard({
       ? Math.round(((comparePrice - currentPrice) / comparePrice) * 100)
       : null;
 
-  const handleQuickAdd = (e: React.MouseEvent) => {
+  const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (hasVariants) {
       window.location.href = `/products/${slug}`;
       return;
     }
+    setAdding(true);
     addItem({
       productId: id,
       name,
@@ -55,108 +54,130 @@ export function ProductCard({
       imageId,
       maxStock: stockQuantity,
     });
+    setTimeout(() => setAdding(false), 1200);
   };
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60">
-      {/* Product Image */}
+    <article className="group relative flex flex-col overflow-hidden rounded-2xl bg-white border border-cream-200/80 card-premium">
+
+      {/* ── Image Zone ──────────────────────────────────────────────────────── */}
       <Link
         href={`/products/${slug}`}
-        className="relative aspect-square w-full overflow-hidden bg-slate-100 block"
+        className="relative w-full overflow-hidden bg-cream-50 block"
+        aria-label={name}
       >
         {imageId ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={`/api/images/${imageId}`}
             alt={name}
-            className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-auto object-contain transition-transform duration-500 ease-out group-hover:scale-[1.04]"
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-slate-400">
-            <ShoppingBag className="w-12 h-12 stroke-[1.2]" />
+          <div className="flex h-52 w-full items-center justify-center bg-gradient-to-br from-cream-100 to-cream-200">
+            <Leaf className="w-10 h-10 text-cream-400 stroke-[1.2]" />
           </div>
         )}
 
-        {/* Badges */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
+        {/* ── Badges ────────────────────────────────────────────────────────── */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
           {discountPercent && discountPercent > 0 && (
-            <Badge variant="danger" className="font-bold text-[11px] shadow-sm">
-              {discountPercent}% ছাড়
-            </Badge>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-saffron-500 text-white text-[11px] font-black shadow-md">
+              -{discountPercent}% ছাড়
+            </span>
           )}
           {hasVariants && (
-            <Badge variant="info" className="font-semibold text-[10px] shadow-sm">
-              ভ্যারিয়েন্ট
-            </Badge>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-navy-700 text-white text-[10px] font-bold shadow-sm">
+              ভ্যারিয়েন্ট
+            </span>
           )}
           {isOutOfStock && (
-            <Badge variant="danger" className="font-bold text-[11px] shadow-sm">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-red-500 text-white text-[10px] font-bold shadow-sm">
               স্টক শেষ
-            </Badge>
+            </span>
           )}
         </div>
 
-        {/* Hover Quick View Overlay */}
-        <div className="absolute inset-0 bg-slate-900/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center justify-center">
-          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 text-slate-800 text-xs font-semibold shadow-md backdrop-blur-sm">
-            <Eye className="w-3.5 h-3.5 text-brand-700" />
-            <span>বিস্তারিত দেখুন</span>
-          </span>
+        {/* ── Hover Overlay ─────────────────────────────────────────────────── */}
+        <div className="absolute inset-0 bg-gradient-to-t from-navy-900/30 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center">
+            <span className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-white/95 text-navy-800 text-xs font-bold shadow-lg backdrop-blur-sm translate-y-3 group-hover:translate-y-0 transition-transform duration-300">
+              <Eye className="w-3.5 h-3.5 text-saffron-600" />
+              বিস্তারিত দেখুন
+            </span>
+          </div>
         </div>
       </Link>
 
-      {/* Content */}
-      <div className="flex flex-1 flex-col p-4">
-        {categoryName && (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-700 mb-1">
-            {categoryName}
-          </span>
-        )}
+      {/* ── Content Zone ────────────────────────────────────────────────────── */}
+      <div className="flex flex-1 flex-col p-4 gap-2.5">
 
+        {/* Name */}
         <Link
           href={`/products/${slug}`}
-          className="text-sm font-bold text-slate-800 line-clamp-2 hover:text-brand-700 transition"
+          className="text-sm font-bold text-navy-900 line-clamp-2 hover:text-saffron-700 transition-colors duration-200 leading-snug"
         >
           {name}
         </Link>
 
-        {/* Pricing */}
-        <div className="mt-3 flex items-baseline gap-2">
+        {/* Authenticity tag */}
+        <div className="flex items-center gap-1">
+          <CheckCircle2 className="w-3 h-3 text-herbal-500 flex-shrink-0" />
+          <span className="text-[10px] text-herbal-700 font-semibold">১০০% খাঁটি ও প্রাকৃতিক</span>
+        </div>
+
+        {/* Price */}
+        <div className="flex items-baseline gap-2 mt-auto">
           {hasVariants && (
-            <span className="text-xs text-slate-500 font-medium">শুরু</span>
+            <span className="text-[10px] text-navy-500 font-medium">শুরু</span>
           )}
-          <span className="text-base font-extrabold text-slate-900">
+          <span className="text-lg font-black text-navy-900">
             {formatPrice(currentPrice)}
           </span>
           {comparePrice && comparePrice > currentPrice && (
-            <span className="text-xs text-slate-400 line-through">
+            <span className="text-xs text-navy-400 line-through font-medium">
               {formatPrice(comparePrice)}
             </span>
           )}
         </div>
 
-        {/* Action Button */}
-        <div className="mt-4 pt-3 border-t border-slate-100">
+        {/* CTA Button */}
+        <div className="pt-2 border-t border-cream-200">
           {hasVariants ? (
             <Link
               href={`/products/${slug}`}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 py-2.5 px-3 text-xs font-bold text-slate-700 transition hover:bg-brand-50 hover:text-brand-700"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-navy-200 py-2.5 text-xs font-bold text-navy-700 transition-all hover:border-saffron-400 hover:text-saffron-700 hover:bg-saffron-50"
             >
-              <span>অপশন নির্বাচন করুন</span>
+              অপশন নির্বাচন করুন
             </Link>
           ) : (
             <button
               onClick={handleQuickAdd}
-              disabled={isOutOfStock}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-700 py-2.5 px-3 text-xs font-bold text-white transition hover:bg-brand-800 disabled:opacity-50 disabled:pointer-events-none shadow-sm shadow-brand-900/10 active:scale-[0.98]"
+              disabled={isOutOfStock || adding}
+              className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all duration-200 active:scale-[0.97] ${
+                adding
+                  ? "bg-herbal-600 text-white"
+                  : isOutOfStock
+                  ? "bg-cream-200 text-navy-400 cursor-not-allowed"
+                  : "btn-saffron"
+              }`}
             >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              <span>{isOutOfStock ? "স্টক নেই" : "ব্যাগে যোগ করুন"}</span>
+              {adding ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>যোগ হয়েছে!</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>{isOutOfStock ? "স্টক নেই" : "ব্যাগে যোগ করুন"}</span>
+                </>
+              )}
             </button>
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }

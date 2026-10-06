@@ -13,6 +13,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  Tag,
 } from "lucide-react";
 
 export function AdminOrderDetailClient({ order }: { order: any }) {
@@ -179,6 +180,20 @@ export function AdminOrderDetailClient({ order }: { order: any }) {
               <span>ডেলিভারি চার্জ</span>
               <span>{formatPrice(order.deliveryFeePoisha)}</span>
             </div>
+            {Number(order.discountPoisha) > 0 && (
+              <div className="flex justify-between items-center py-1.5 px-2 -mx-2 rounded-lg bg-emerald-900/20 border border-emerald-800/30 text-emerald-400">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <Tag className="w-3 h-3" />
+                  রেফারেল ছাড়
+                  {order.referralCodeSnapshot && (
+                    <span className="font-mono font-bold text-emerald-300">
+                      ({order.referralCodeSnapshot})
+                    </span>
+                  )}
+                </span>
+                <span className="font-bold">- {formatPrice(order.discountPoisha)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-base font-bold text-white pt-2 border-t border-slate-800">
               <span>সর্বমোট প্রদেয়</span>
               <span className="text-emerald-400">{formatPrice(order.totalPoisha)}</span>
