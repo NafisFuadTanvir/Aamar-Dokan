@@ -6,7 +6,6 @@ import { useCart } from "@/context/CartContext";
 import { useSession } from "next-auth/react";
 import {
   ShoppingBag,
-  Search,
   User,
   Menu,
   X,
@@ -16,12 +15,12 @@ import {
   Leaf,
   ChevronRight,
 } from "lucide-react";
+import { SearchBar } from "@/components/layout/SearchBar";
 
 export function Header() {
   const { totalItems, setIsOpen } = useCart();
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
 
   // First word of user name for display
@@ -32,13 +31,6 @@ export function Header() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      window.location.href = `/products?search=${encodeURIComponent(searchQuery.trim())}`;
-    }
-  };
 
   return (
     <header
@@ -128,19 +120,7 @@ export function Header() {
           </nav>
 
           {/* ── Search Bar ───────────────────────────────────────────────── */}
-          <form
-            onSubmit={handleSearchSubmit}
-            className="hidden md:flex flex-1 max-w-xs xl:max-w-sm relative"
-          >
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="পণ্য বা ব্র্যান্ড খুঁজুন..."
-              className="w-full bg-cream-100 border border-cream-300 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-navy-900 placeholder-navy-400 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-saffron-400/30 focus:border-saffron-400 transition-all duration-200"
-            />
-            <Search className="w-4 h-4 text-navy-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </form>
+          <SearchBar className="hidden md:flex flex-1 max-w-xs xl:max-w-sm" />
 
           {/* ── Right Actions ─────────────────────────────────────────────── */}
           <div className="flex items-center gap-2 sm:gap-2.5">
@@ -175,16 +155,11 @@ export function Header() {
 
         {/* Mobile Search */}
         <div className="pb-3 md:hidden">
-          <form onSubmit={handleSearchSubmit} className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="পণ্য খুঁজুন..."
-              className="w-full bg-cream-100 border border-cream-200 rounded-2xl pl-9 pr-4 py-2.5 text-xs text-navy-900 placeholder-navy-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-saffron-400/25 focus:border-saffron-400 transition"
-            />
-            <Search className="w-3.5 h-3.5 text-navy-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </form>
+          <SearchBar
+            isMobile
+            className="w-full"
+            placeholder="পণ্য খুঁজুন (বাংলা, Banglish, English)..."
+          />
         </div>
       </div>
 

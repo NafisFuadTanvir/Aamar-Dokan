@@ -115,6 +115,11 @@ model User {
   updatedAt       DateTime   @updatedAt
   lastLoginAt     DateTime?
 
+  // Fraud Watch — সন্দেহজনক গ্রাহক চিহ্নিতকরণ
+  isFlagged       Boolean    @default(false)  // admin কর্তৃক সন্দেহজনক হিসেবে চিহ্নিত
+  flagReason      String?                     // কেন চিহ্নিত করা হয়েছে (অভ্যন্তরীণ নোট)
+  flaggedAt       DateTime?                   // কখন চিহ্নিত করা হয়েছে
+
   // Auth.js relations
   accounts Account[]
   sessions Session[]
@@ -130,6 +135,7 @@ model User {
   @@index([email])
   @@index([phone])
   @@index([role, status])
+  @@index([isFlagged])  // fraud watch queries
   @@map("users")
 }
 

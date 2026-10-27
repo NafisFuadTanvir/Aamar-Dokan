@@ -140,12 +140,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Fetch user phone for review display
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { phone: true, name: true },
+    });
+
     return NextResponse.json(
       {
         success: true,
         message: "আপনার রিভিউ সফলভাবে প্রকাশ করা হয়েছে!",
         reviewId: review.id,
         isVerifiedPurchase,
+        orderNumber: deliveredOrder?.orderNumber || null,
+        phone: user?.phone || null,
       },
       { status: 201 }
     );

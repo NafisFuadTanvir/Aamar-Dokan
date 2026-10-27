@@ -55,7 +55,17 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         reviews: {
           where: { status: "APPROVED" },
           include: {
-            user: { select: { name: true } },
+            user: {
+              select: {
+                name: true,
+                phone: true,
+                orders: {
+                  take: 1,
+                  orderBy: { createdAt: "desc" },
+                  select: { orderNumber: true },
+                },
+              },
+            },
           },
           orderBy: { createdAt: "desc" },
         },
@@ -111,11 +121,58 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         {
           id: "r1",
           rating: 5,
-          title: "অসাধারণ স্বাদ ও খাঁটি মধু!",
-          comment: "আমি নিয়মিত ব্যবহার করছি। সুন্দরবনের খাঁটি মধুর স্বাদ পাওয়া যায়। প্যাকেজিং খুব ভালো ছিল।",
-          createdAt: new Date().toISOString(),
+          title: "অসাধারণ স্বাদ ও খাঁটি সুন্দরবনের মধু!",
+          comment: "আমি নিয়মিত পরিবার নিয়ে এই মধু ব্যবহার করছি। সুন্দরবনের খাঁটি কাঁচা মধুর আসল স্বাদ ও ঘ্রাণ পাওয়া যায়। প্যাকেজিং ও ডেলিভারি দুটোই সেরা ছিল।",
+          createdAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
           isVerifiedPurchase: true,
-          user: { name: "তানভীর আহমেদ" },
+          orderNumber: "ORD-20241012-0042",
+          user: {
+            name: "তানভীর আহমেদ",
+            phone: "01712345678",
+            orders: [{ orderNumber: "ORD-20241012-0042" }],
+          },
+        },
+        {
+          id: "r2",
+          rating: 5,
+          title: "একদম নির্ভেজাল ও দ্রুত ডেলিভারি",
+          comment: "অর্ডার করার ২ দিনের মধ্যে হাতে পেয়েছি। মধুর ঘনত্ব, ন্যাচারাল কালার ও ফ্লেভার সত্যি চমৎকার। যারা অর্গানিক মধু খুঁজছেন তারা নির্দ্বিধায় নিতে পারেন।",
+          createdAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+          isVerifiedPurchase: true,
+          orderNumber: "ORD-20241008-0118",
+          user: {
+            name: "নাফিস ফুয়াদ",
+            phone: "01323237011",
+            orders: [{ orderNumber: "ORD-20241008-0118" }],
+          },
+        },
+        {
+          id: "r3",
+          rating: 4,
+          title: "প্যাকেজিং ও কোয়ালিটি অনেক ভালো",
+          comment: "প্রোডাক্ট কোয়ালিটি দারুণ এবং কোনো ভেজাল বা কৃত্রিম চিনি নেই। কাচের জার ভালো সুরক্ষিত ছিল। ইনশাআল্লাহ আবার অর্ডার করব।",
+          createdAt: new Date(Date.now() - 11 * 24 * 3600 * 1000).toISOString(),
+          isVerifiedPurchase: true,
+          orderNumber: "ORD-20240928-0205",
+          user: {
+            name: "মো: রফিকুল ইসলাম",
+            phone: "01855987123",
+            orders: [{ orderNumber: "ORD-20240928-0205" }],
+          },
+        },
+        {
+          id: "r4",
+          rating: 5,
+          title: "বাচ্চাদের জন্য আদর্শ পুষ্টিকর মধু",
+          comment: "প্রতিদিন সকালে গরম পানির সাথে খাচ্ছি। এলার্জি বা কোনো সমস্যা হয়নি, একদম ন্যাচারাল কাঁচা মধু। কাস্টমার সার্ভিসও চমৎকার।",
+          createdAt: new Date(Date.now() - 18 * 24 * 3600 * 1000).toISOString(),
+          isVerifiedPurchase: true,
+          orderNumber: "ORD-20240920-0331",
+          user: {
+            name: "সালমা চৌধুরী",
+            phone: "01911432190",
+            orders: [{ orderNumber: "ORD-20240920-0331" }],
+          },
         },
       ],
     };

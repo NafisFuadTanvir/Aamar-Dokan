@@ -7,6 +7,9 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import { Leaf, SlidersHorizontal } from "lucide-react";
 
+import { expandSearchTerms } from "@/lib/search/bengaliSearch";
+import { Sparkles } from "lucide-react";
+
 export const revalidate = 30;
 
 interface ProductsPageProps {
@@ -25,12 +28,24 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const skip = (page - 1) * pageSize;
 
   let whereClause: any = { status: "PUBLISHED" };
+  let expandedInfo: ReturnType<typeof expandSearchTerms> | null = null;
 
-  if (searchQuery) {
-    whereClause.OR = [
-      { name: { contains: searchQuery, mode: "insensitive" } },
-      { description: { contains: searchQuery, mode: "insensitive" } },
-    ];
+  if (searchQuery && searchQuery.trim()) {
+    expandedInfo = expandSearchTerms(searchQuery.trim());
+    const terms = expandedInfo.terms;
+
+    const orConditions: any[] = [];
+    for (const term of terms) {
+      if (!term) continue;
+      orConditions.push({ name: { contains: term, mode: "insensitive" } });
+      orConditions.push({ shortDescription: { contains: term, mode: "insensitive" } });
+      orConditions.push({ description: { contains: term, mode: "insensitive" } });
+      orConditions.push({ category: { name: { contains: term, mode: "insensitive" } } });
+    }
+
+    if (orConditions.length > 0) {
+      whereClause.OR = orConditions;
+    }
   }
 
   let orderBy: any = { createdAt: "desc" };
@@ -80,6 +95,29 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <p className="text-xs sm:text-sm text-navy-500 mt-1">
               মোট {totalCount}টি পণ্য পাওয়া গেছে
             </p>
+
+            {/* Multilingual Match Badges */}
+            {expandedInfo && expandedInfo.terms.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2">
+                <span className="text-[11px] font-semibold text-navy-400 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-saffron-500" />
+                  সম্পর্কিত কীওয়ার্ড:
+                </span>
+                {expandedInfo.terms.slice(0, 5).map((term) => (
+                  <Link
+                    key={term}
+                    href={`/products?search=${encodeURIComponent(term)}`}
+                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium transition ${
+                      term.toLowerCase() === (searchQuery ?? "").toLowerCase()
+                        ? "bg-saffron-100 text-saffron-800 border border-saffron-300"
+                        : "bg-white border border-cream-300 text-navy-600 hover:bg-cream-100 hover:text-navy-900"
+                    }`}
+                  >
+                    {term}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <SortSelect defaultValue={sort} />
@@ -89,7 +127,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         {/* Products Grid — full width, no sidebar */}
         <div className="pt-8">
           {products.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-16 bg-white rounded-3xl border border-cream-200 text-center space-y-4 card-premium">
+            <div className="flex flex-col items-center justify-center p-12 sm:p-16 bg-white rounded-3xl border border-cream-200 text-center space-y-4 card-premium">
               <div className="w-16 h-16 rounded-3xl bg-cream-100 flex items-center justify-center">
                 <SlidersHorizontal className="w-8 h-8 text-cream-400" />
               </div>
@@ -97,19 +135,47 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <h3 className="text-base font-black text-navy-800">
                   কোনো পণ্য পাওয়া যায়নি
                 </h3>
-                <p className="text-xs text-navy-500 mt-1">
+                <p className="text-xs text-navy-500 mt-1 max-w-md mx-auto">
                   {searchQuery
-                    ? "অন্য শব্দ দিয়ে অনুসন্ধান করে দেখুন"
+                    ? `"${searchQuery}" এর জন্য কোনো পণ্য পাওয়া যায়নি। আপনি বাংলা, ইংরেজি অথবা বাংলিশে লিখে দেখতে পারেন (যেমন: modhu, honey, সরিষার তেল, nakshi kantha)।`
                     : "শীঘ্রই নতুন পণ্য যোগ হবে"}
                 </p>
               </div>
+
+              {/* Popular quick searches */}
+              <div className="pt-2">
+                <p className="text-[11px] font-bold text-navy-400 mb-2 uppercase tracking-wider">
+                  জনপ্রিয় অনুসন্ধান
+                </p>
+                <div className="flex flex-wrap justify-center gap-1.5 max-w-md">
+                  {[
+                    { label: "মধু (Honey)", query: "মধু" },
+                    { label: "সরিষার তেল (Mustard Oil)", query: "সরিষা" },
+                    { label: "কালোজিরা (Black Seed)", query: "কালোজিরা" },
+                    { label: "নকশিকাঁথা (Kantha)", query: "নকশিকাঁথা" },
+                    { label: "ঘি (Ghee)", query: "ঘি" },
+                    { label: "অর্গানিক ফুড", query: "organic" },
+                  ].map((s) => (
+                    <Link
+                      key={s.query}
+                      href={`/products?search=${encodeURIComponent(s.query)}`}
+                      className="px-2.5 py-1 rounded-lg bg-cream-100 hover:bg-cream-200 border border-cream-300 text-[11px] font-medium text-navy-700 transition"
+                    >
+                      {s.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
               {searchQuery && (
-                <Link
-                  href="/products"
-                  className="px-5 py-2 rounded-xl btn-navy text-xs font-bold"
-                >
-                  সকল পণ্য দেখুন
-                </Link>
+                <div className="pt-2">
+                  <Link
+                    href="/products"
+                    className="px-5 py-2 rounded-xl btn-navy text-xs font-bold inline-block"
+                  >
+                    সকল পণ্য দেখুন
+                  </Link>
+                </div>
               )}
             </div>
           ) : (

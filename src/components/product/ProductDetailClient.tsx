@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { ProductReviewsSection } from "./ProductReviewsSection";
 
 export interface VariantType {
   id: string;
@@ -46,10 +47,14 @@ export interface ReviewType {
   title?: string | null;
   comment: string;
   createdAt: string | Date;
-  user: {
+  user?: {
     name?: string | null;
-  };
+    phone?: string | null;
+    orders?: { orderNumber: string }[];
+  } | null;
   isVerifiedPurchase: boolean;
+  orderNumber?: string | null;
+  phone?: string | null;
 }
 
 export interface ProductDetailProps {
@@ -136,89 +141,8 @@ export function ProductDetailClient({ product }: ProductDetailProps) {
     }
   }, [showStickyBar]);
 
-  // ── Review system state ────────────────────────────────────────────────────
-  const { data: session, status: sessionStatus } = useSession();
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewHover, setReviewHover] = useState(0);
-  const [reviewTitle, setReviewTitle] = useState("");
-  const [reviewComment, setReviewComment] = useState("");
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
-  const [reviewError, setReviewError] = useState("");
-  const [canReview, setCanReview] = useState<null | boolean>(null);
-  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+  // ── Review state ───────────────────────────────────────────────────────────
   const [localReviews, setLocalReviews] = useState(product.reviews);
-
-  // Check eligibility once session is known
-  useEffect(() => {
-    if (sessionStatus === "authenticated" && product.id) {
-      fetch(`/api/reviews?productId=${product.id}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.reason === "already_reviewed") {
-            setAlreadyReviewed(true);
-            setCanReview(false);
-          } else {
-            setCanReview(data.canReview ?? false);
-          }
-        })
-        .catch(() => setCanReview(false));
-    }
-  }, [sessionStatus, product.id]);
-
-  const handleReviewSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (reviewRating === 0) {
-        setReviewError("অনুগ্রহ করে স্টার রেটিং দিন।");
-        return;
-      }
-      if (!reviewComment.trim() || reviewComment.trim().length < 10) {
-        setReviewError("মন্তব্য কমপক্ষে ১০ অক্ষরের হতে হবে।");
-        return;
-      }
-      setReviewError("");
-      setReviewSubmitting(true);
-      try {
-        const res = await fetch("/api/reviews", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productId: product.id,
-            rating: reviewRating,
-            title: reviewTitle.trim() || null,
-            comment: reviewComment.trim(),
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setReviewError(data.error || "রিভিউ জমা দেওয়া সম্ভব হয়নি।");
-        } else {
-          setReviewSubmitted(true);
-          setAlreadyReviewed(true);
-          setCanReview(false);
-          setLocalReviews((prev) => [
-            {
-              id: data.reviewId || `r-${Date.now()}`,
-              rating: reviewRating,
-              title: reviewTitle.trim() || null,
-              comment: reviewComment.trim(),
-              createdAt: new Date().toISOString(),
-              isVerifiedPurchase: data.isVerifiedPurchase ?? false,
-              user: { name: session?.user?.name || "সম্মানিত ক্রেতা" },
-            },
-            ...prev,
-          ]);
-        }
-      } catch {
-        setReviewError("নেটওয়ার্ক সমস্যা। পরে আবার চেষ্টা করুন।");
-      } finally {
-        setReviewSubmitting(false);
-      }
-    },
-    [reviewRating, reviewComment, reviewTitle, product.id, session?.user?.name]
-  );
-  // ──────────────────────────────────────────────────────────────────────────
 
   // Compute active price & stock
   const currentPricePoisha = selectedVariant
@@ -536,224 +460,14 @@ export function ProductDetailClient({ product }: ProductDetailProps) {
           </div>
         </div>
 
-        {/* Customer Reviews Section */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-5">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                গ্রাহক মতামত ও রিভিউ ({localReviews.length})
-              </h2>
-              {avgRating && (
-                <div className="flex items-center gap-2 mt-1.5">
-                  <div className="flex">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${
-                          i < Math.round(Number(avgRating))
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-slate-200"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm font-bold text-slate-800">{avgRating}</span>
-                  <span className="text-xs text-slate-400">/ ৫.০</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Review Submit Form ── */}
-          <div className="rounded-2xl border border-cream-200 bg-cream-50 p-5">
-            <h3 className="text-sm font-bold text-navy-900 mb-4">আপনার মতামত দিন</h3>
-
-            {sessionStatus === "loading" ? (
-              /* Loading skeleton */
-              <div className="space-y-3 animate-pulse py-2">
-                <div className="h-8 bg-cream-200 rounded-xl w-3/4" />
-                <div className="h-4 bg-cream-200 rounded-lg w-1/2" />
-              </div>
-            ) : sessionStatus === "unauthenticated" ? (
-              /* Not logged in */
-              <div className="flex flex-col items-center gap-3 py-5 text-center">
-                <LogIn className="w-9 h-9 text-navy-300" />
-                <p className="text-sm text-navy-600">রিভিউ দিতে হলে আগে লগইন করুন</p>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl btn-navy text-sm font-semibold"
-                >
-                  <LogIn className="w-4 h-4" />
-                  লগইন করুন
-                </Link>
-              </div>
-            ) : reviewSubmitted ? (
-              /* Just submitted */
-              <div className="flex flex-col items-center gap-3 py-5 text-center">
-                <CheckCircle2 className="w-11 h-11 text-herbal-500" />
-                <p className="text-sm font-bold text-navy-900">আপনার রিভিউ সফলভাবে প্রকাশ করা হয়েছে!</p>
-                <p className="text-xs text-navy-500">ধন্যবাদ আপনার মূল্যবান মতামত দেওয়ার জন্য।</p>
-              </div>
-            ) : alreadyReviewed ? (
-              /* Already reviewed */
-              <div className="flex flex-col items-center gap-3 py-5 text-center">
-                <CheckCircle2 className="w-9 h-9 text-herbal-500" />
-                <p className="text-sm text-navy-800 font-semibold">
-                  আপনি ইতিমধ্যে এই পণ্যে আপনার রিভিউ দিয়েছেন।
-                </p>
-              </div>
-            ) : (
-              /* Review Form */
-              <form onSubmit={handleReviewSubmit} className="space-y-4">
-                {/* Star Rating */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-2">
-                    রেটিং দিন <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: 5 }).map((_, i) => {
-                      const starVal = i + 1;
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setReviewRating(starVal)}
-                          onMouseEnter={() => setReviewHover(starVal)}
-                          onMouseLeave={() => setReviewHover(0)}
-                          className="transition-transform hover:scale-110 focus:outline-none"
-                        >
-                          <Star
-                            className={`w-8 h-8 transition-colors ${
-                              starVal <= (reviewHover || reviewRating)
-                                ? "fill-amber-400 text-amber-400"
-                                : "text-slate-300"
-                            }`}
-                          />
-                        </button>
-                      );
-                    })}
-                    {reviewRating > 0 && (
-                      <span className="ml-2 text-sm text-slate-600 self-center font-medium">
-                        {["খুব খারাপ", "খারাপ", "মোটামুটি", "ভালো", "অসাধারণ!"][reviewRating - 1]}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Title */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    শিরোনাম (ঐচ্ছিক)
-                  </label>
-                  <input
-                    type="text"
-                    value={reviewTitle}
-                    onChange={(e) => setReviewTitle(e.target.value)}
-                    placeholder="যেমন: দারুণ পণ্য!"
-                    maxLength={100}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-cream-200 bg-white text-sm text-navy-900 placeholder-navy-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/30 focus:border-saffron-400 transition"
-                  />
-                </div>
-
-                {/* Comment */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    মন্তব্য <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={reviewComment}
-                    onChange={(e) => setReviewComment(e.target.value)}
-                    placeholder="পণ্যটি সম্পর্কে আপনার অভিজ্ঞতা শেয়ার করুন..."
-                    rows={4}
-                    maxLength={1000}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-cream-200 bg-white text-sm text-navy-900 placeholder-navy-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/30 focus:border-saffron-400 transition resize-none"
-                  />
-                  <p className="text-right text-[10px] text-slate-400 mt-0.5">
-                    {reviewComment.length}/১০০০
-                  </p>
-                </div>
-
-                {/* Error */}
-                {reviewError && (
-                  <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
-                    {reviewError}
-                  </p>
-                )}
-
-                {/* Submit */}
-                <button
-                  type="submit"
-                  disabled={reviewSubmitting || reviewRating === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl btn-saffron text-sm font-bold disabled:opacity-50 disabled:pointer-events-none transition active:scale-[0.98] shadow-sm"
-                >
-                  <Send className="w-4 h-4" />
-                  {reviewSubmitting ? "জমা দেওয়া হচ্ছে..." : "রিভিউ জমা দিন"}
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* ── Reviews List ── */}
-          {localReviews.length === 0 ? (
-            <p className="text-xs text-slate-500 py-4 text-center">
-              এই পণ্যে এখনও কোনো প্রকাশিত রিভিউ নেই।
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {localReviews.map((r) => (
-                <div
-                  key={r.id}
-                  className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* Avatar */}
-                      <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm flex-shrink-0">
-                        {(r.user?.name || "ক")[0]}
-                      </div>
-                      <div>
-                        <span className="font-bold text-xs text-slate-900 block">
-                          {r.user?.name || "সম্মানিত ক্রেতা"}
-                        </span>
-                        {r.isVerifiedPurchase && (
-                          <Badge variant="success" className="text-[9px] px-1.5">
-                            ✓ যাচাইকৃত ক্রেতা
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    {/* Stars */}
-                    <div className="flex text-amber-400 flex-shrink-0">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-3.5 h-3.5 ${
-                            i < r.rating
-                              ? "fill-amber-400 text-amber-400"
-                              : "text-slate-200"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  {r.title && (
-                    <h4 className="text-xs font-bold text-slate-800">{r.title}</h4>
-                  )}
-                  <p className="text-xs text-slate-600 leading-relaxed">{r.comment}</p>
-                  <p className="text-[10px] text-slate-400">
-                    {new Date(r.createdAt).toLocaleDateString("bn-BD", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Modern Animated Customer Reviews Section */}
+        <ProductReviewsSection
+          productId={product.id}
+          productName={product.name}
+          initialReviews={localReviews}
+          avgRating={avgRating}
+          onReviewsChange={setLocalReviews}
+        />
       </div>
 
       {/* ── GSAP Floating Sticky Purchase Bar ── */}
